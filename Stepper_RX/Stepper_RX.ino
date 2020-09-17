@@ -6,7 +6,7 @@ const int dirPin = 4;
 const int stepPin = 5;
 
 int joystickValue = 0;
-int joystickDeadzone = 50;
+int joystickDeadzone = 255;
 int joystickCenter = 511;
 
 void setup() {

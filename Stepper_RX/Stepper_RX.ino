@@ -2,7 +2,12 @@
 
 SoftwareSerial BlueSerial(2, 3); // RX, TX
 
+const int dirPin = 4;
+const int stepPin = 5;
+
 int joystickValue = 0;
+int joystickDeadzone = 50;
+int joystickCenter = 511;
 
 void setup() {
   // Open serial communications and wait for port to open:
@@ -16,7 +21,7 @@ void setup() {
 }
 
 void loop() {
-  // read in bytes and convert to int with '\n' delimiter
+  // Read in bytes and convert to int with '\n' delimiter
   while (BlueSerial.available()) {
     char incomingByte = BlueSerial.read();
     static String incomingMessage;
@@ -29,5 +34,31 @@ void loop() {
   }
 
   // do stuff
-  Serial.println(joystickValue);
+  
+
+  // Set Direction
+  if (joystickValue - joystickCenter > joystickDeadzone) {
+    digitalWrite(dirPin, HIGH);
+    // Step
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(2000);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(2000);
+
+    Serial.print("R ");
+    Serial.println(joystickValue - joystickCenter);
+    
+  } else if (joystickValue - joystickCenter < -joystickDeadzone) {
+    digitalWrite(dirPin, LOW);
+    // Step
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(2000);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(2000);
+
+    Serial.print("L ");
+    Serial.println(joystickValue - joystickCenter);
+  }
+
+  
 }

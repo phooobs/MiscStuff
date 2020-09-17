@@ -1,6 +1,7 @@
 #include <SoftwareSerial.h>
 
-const int joystickPin = A7;
+const int joystickYPin = A7;
+int joystickMaxValue = 0;
 
 SoftwareSerial BlueSerial(2, 3); // RX, TX
 
@@ -10,5 +11,9 @@ void setup() {
 }
 
 void loop() {
-    BlueSerial.println(analogRead(joystickPin));
+  int joystickValue = analogRead(joystickYPin);
+  if (joystickMaxValue < joystickValue) {
+    joystickMaxValue = joystickValue;
+  }
+  BlueSerial.println(int(float(joystickValue) * 1023.0 / float(joystickMaxValue)));
 }

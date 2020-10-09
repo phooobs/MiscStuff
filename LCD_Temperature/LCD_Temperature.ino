@@ -13,6 +13,14 @@ DallasTemperature temperatureSensor(&oneWire);
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
+// state
+enum States {LOGGING, WIFI_CONFIG};
+
+// SPI commands
+const byte SIMO_TEMPERATURE = B00000001;
+const byte MISO_WIFI = B00000010;
+const byte SIMO_WIFI = B00000011;
+
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
@@ -35,26 +43,41 @@ void setup() {
 }
 
 void loop() {
-  temperatureSensor.requestTemperatures();
-  temperature = temperatureSensor.getTempCByIndex(0);
-
-  // send data to slave
-  digitalWrite(SS, LOW); // enable Slave Select
-  String sendData = String(temperature);
-  for (unsigned int i = 0; i < sendData.length(); i++) {
-    SPI.transfer(sendData[i]);
-  }
-  SPI.transfer('\r');
-  digitalWrite(SS, HIGH); // disable Slave Select
+  static States state;
   
-  display.clearDisplay();
-  display.setTextSize(1);      // Normal 1:1 pixel scale
-  display.setTextColor(SSD1306_WHITE); // Draw white text
-  display.setCursor(0, 0);     // Start at top-left corner
-  display.cp437(true);         // Use full 256 char 'Code Page 437' font
-  display.print("Temperature: ");
-  display.print(temperature);
-  display.print(char(248)); // degree charicter
-  display.print("C");
-  display.display();
+  switch(state) {
+    case LOGGING :
+      temperatureSensor.requestTemperatures();
+      temperature = temperatureSensor.getTempCByIndex(0);
+
+      // send temperature data to slave
+      digitalWrite(SS, LOW); // enable Slave Select
+      SPI.transfer(SIMO_TEMPERATURE);
+      String sendData = String(temperature);
+      for (unsigned int i = 0; i < sendData.length(); i++) {
+        SPI.transfer(sendData[i]);
+      }
+      SPI.transfer('\r');
+      digitalWrite(SS, HIGH); // disable Slave Select
+      
+      display.clearDisplay();
+      display.setTextSize(1);      // Normal 1:1 pixel scale
+      display.setTextColor(SSD1306_WHITE); // Draw white text
+      display.setCursor(0, 0);     // Start at top-left corner
+      display.cp437(true);         // Use full 256 char 'Code Page 437' font
+      display.print("Temperature: ");
+      display.print(temperature);
+      display.print(char(248)); // degree charicter
+      display.print("C");
+      display.display();
+      break;
+      
+    case WIFI_CONFIG :
+      state = TRANSFER_TEMPERATURE;
+      break;
+
+    default :
+      state = TRANSFER_TEMPERATURE;
+      break;
+  }
 }

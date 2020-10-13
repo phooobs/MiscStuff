@@ -24,7 +24,7 @@ DallasTemperature temperatureSensor(&oneWire);
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 // state
-enum States {LOGGING, WIFI_CONFIG};
+enum States {LOGGING, WIFI_CONFIG, PASSWORD_CONFIG};
 
 // SPI commands
 const byte SIMO_TEMPERATURE = B00000001;
@@ -70,6 +70,18 @@ void loop() {
     case WIFI_CONFIG :
       state = wifiConfig();
       break;
+  
+    case PASSWORD_CONFIG : {
+      static unsigned int position;
+      static String password;
+      if (editValue(&password, &position)) {
+        state = WIFI_CONFIG;
+        position = 0;
+      } else {
+        state = PASSWORD_CONFIG;
+      }
+    } break;
+   
 
     default :
       state = LOGGING;
@@ -116,7 +128,7 @@ States logging () {
 
 States wifiConfig () {
   enum MenuItem {BACK, ACCESS_POINT, PASSWORD, APPLY, END};
-  const String menuItemText[] = {"Back", "Set Access Point", "Set Password", "Apply"};
+  const String menuItemText[] = {"Back", "Access Point", "Password", "Apply"};
   static MenuItem menuPosition;
 
   if ((upButtonState == true) && (lastUpButtonState == false)) { // menu up
@@ -154,17 +166,7 @@ States wifiConfig () {
         break; }
   
       case PASSWORD : {
-        Serial.println("Set Password");
-
-        // send temperature data to slave
-        digitalWrite(SS, LOW); // enable Slave Select
-        SPI.transfer(SIMO_PASSWORD);
-        String sendData = "";
-        for (unsigned int i = 0; i < sendData.length(); i++) {
-          SPI.transfer(sendData[i]);
-        }
-        SPI.transfer('\r');
-        digitalWrite(SS, HIGH); // disable Slave Select
+        return PASSWORD_CONFIG;
         break; }
 
       case APPLY : {
@@ -180,20 +182,80 @@ States wifiConfig () {
   display.clearDisplay();
   display.setTextSize(1);      // Normal 1:1 pixel scale
 
-  
-  
   for (MenuItem i = 0; i < END; i = i + 1) {
     display.setCursor(2, 2 + i * 10);     // Start at top-left corner
     if (menuPosition == i) {
-      display.setTextColor(SSD1306_WHITE); // selected item, Draw Black text
       display.drawRect(0, i*10, SCREEN_WIDTH, 11, SSD1306_WHITE);
-    } else {
-      display.setTextColor(SSD1306_WHITE); // not selected item, Draw white text
     }
+    display.setTextColor(SSD1306_WHITE);
     display.print(menuItemText[i]);
+    Serial.print(menuItemText[i]);
   }
-  
+  Serial.println();
   display.display();
 
   return WIFI_CONFIG;
+}
+
+bool editValue (String* value, unsigned int* position) { // returns true if value finished entering false if otherwise
+  const int maxLength = 10;
+  String symbols = String(" abcdefghijklmnopqrstuvwxyz"); // list of posable chars
+  unsigned int charIndex; // current index into above string 
+
+  // increase the length of the string to edit char at value
+  while (value->length() < *position + 1) { 
+    *value = *value + " ";
+  }
+
+  // get charIndex at position
+  for (unsigned int i = 0; i < symbols.length(); i++) {
+    if ((*value)[value->length() - 1] == symbols[i]) {
+      charIndex = i;
+      break;
+    }
+  }
+
+  // button input
+  if ((upButtonState == true) && (lastUpButtonState == false)) { // menu up cycle down a char at position
+    charIndex++;
+    if (charIndex == symbols.length()) {
+      charIndex = 0;
+    }
+    (*value)[*position] = symbols[charIndex];
+    Serial.print(charIndex);
+    Serial.print(" ");
+    Serial.print(symbols[charIndex]);
+    Serial.println();
+  } else if ((downButtonState == true) && (lastDownButtonState == false)) { // menu down cycle up a char at position
+    charIndex--;
+    if (charIndex == -1) {
+      charIndex = symbols.length() - 1;
+    }
+    (*value)[*position] = symbols[charIndex];
+    Serial.print(charIndex);
+    Serial.print(" ");
+    Serial.print(symbols[charIndex]);
+    Serial.println();
+  } else if ((selectButtonState == true) && (lastSelectButtonState == false)) { // select button pressed increase position or exit
+    if (*position == maxLength) { // ran out of chars exit editor
+      while ((*value)[value->length() - 1] == " ") { // remove empty spaces at the end
+        *value = value->substr(0, value->length() - 2);
+      }
+      return true;
+    }
+    *position = *position + 1; // go to next position
+  }
+
+  // update display
+  display.clearDisplay();
+  display.drawRect(0, 0, SCREEN_WIDTH, 11, SSD1306_WHITE);
+  display.setTextSize(1);      // Normal 1:1 pixel scale
+  display.setTextColor(SSD1306_WHITE); // Draw white text
+  display.setCursor(2, 2);     // Start at top-left corner
+  display.cp437(true);         // Use full 256 char 'Code Page 437' font
+  display.print(*value);
+  display.drawTriangle(*position * 7 + 2, 12, *position * 7, 14, *position * 7 + 4, 14, SSD1306_WHITE); // draw charicter highlight
+  display.display();
+  
+  return false;
 }

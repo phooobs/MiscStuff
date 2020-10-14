@@ -24,7 +24,7 @@ DallasTemperature temperatureSensor(&oneWire);
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 // state
-enum States {LOGGING, WIFI_CONFIG, PASSWORD_CONFIG};
+enum States {LOGGING, WIFI_CONFIG, ACCESS_POINT_CONFIG, PASSWORD_CONFIG};
 
 // SPI commands
 const byte SIMO_TEMPERATURE = B00000001;
@@ -77,12 +77,42 @@ void loop() {
       if (editValue(&password, &position)) {
         state = WIFI_CONFIG;
         position = 0;
+
+        // send temperature data to slave
+        digitalWrite(SS, LOW); // enable Slave Select
+        SPI.transfer(SIMO_PASSWORD); // transmit command
+        for (unsigned int i = 0; i < password.length(); i++) { // dransmit data asociated with command
+          SPI.transfer(password[i]);
+        }
+        SPI.transfer('\r');
+        digitalWrite(SS, HIGH); // disable Slave Select
+        
       } else {
         state = PASSWORD_CONFIG;
       }
     } break;
-   
 
+    case ACCESS_POINT_CONFIG : {
+      static unsigned int position;
+      static String accesPoint;
+      if (editValue(&accesPoint, &position)) {
+        state = WIFI_CONFIG;
+        position = 0;
+
+        // send temperature data to slave
+        digitalWrite(SS, LOW); // enable Slave Select
+        SPI.transfer(SIMO_ACCESS_POINT); // transmit command
+        for (unsigned int i = 0; i < accesPoint.length(); i++) { // dransmit data asociated with command
+          SPI.transfer(accesPoint[i]);
+        }
+        SPI.transfer('\r');
+        digitalWrite(SS, HIGH); // disable Slave Select
+        
+      } else {
+        state = ACCESS_POINT_CONFIG;
+      }
+    } break;
+   
     default :
       state = LOGGING;
       break;
@@ -128,7 +158,7 @@ States logging () {
 
 States wifiConfig () {
   enum MenuItem {BACK, ACCESS_POINT, PASSWORD, APPLY, END};
-  const String menuItemText[] = {"Back", "Access Point", "Password", "Apply"};
+  const String menuItemText[] = {"Back", "AP", "Paswrd", "Ok"};
   static MenuItem menuPosition;
 
   if ((upButtonState == true) && (lastUpButtonState == false)) { // menu up
@@ -152,17 +182,7 @@ States wifiConfig () {
         break;
         
       case ACCESS_POINT : {
-        Serial.println("Set Access Point");
-
-        // send temperature data to slave
-        digitalWrite(SS, LOW); // enable Slave Select
-        SPI.transfer(SIMO_ACCESS_POINT);
-        String sendData = "Guest";
-        for (unsigned int i = 0; i < sendData.length(); i++) {
-          SPI.transfer(sendData[i]);
-        }
-        SPI.transfer('\r');
-        digitalWrite(SS, HIGH); // disable Slave Select
+        return ACCESS_POINT_CONFIG;
         break; }
   
       case PASSWORD : {
@@ -175,6 +195,7 @@ States wifiConfig () {
         digitalWrite(SS, LOW); // enable Slave Select
         SPI.transfer(SIMO_CONNECT_WIFI);
         digitalWrite(SS, HIGH); // disable Slave Select
+        return LOGGING;
         break; }
     }
   }
@@ -189,17 +210,16 @@ States wifiConfig () {
     }
     display.setTextColor(SSD1306_WHITE);
     display.print(menuItemText[i]);
-    Serial.print(menuItemText[i]);
   }
-  Serial.println();
   display.display();
 
   return WIFI_CONFIG;
 }
 
 bool editValue (String* value, unsigned int* position) { // returns true if value finished entering false if otherwise
-  const int maxLength = 10;
-  String symbols = String(" abcdefghijklmnopqrstuvwxyz"); // list of posable chars
+  const int maxLength = 5; // set to one less than the maximum amount of charicters
+  const int symbolsLength = 1+26;
+  const char symbols[symbolsLength] = " abcdefghijklmnopqrstuvwxyz"; // list of posable chars
   unsigned int charIndex; // current index into above string 
 
   // increase the length of the string to edit char at value
@@ -208,7 +228,7 @@ bool editValue (String* value, unsigned int* position) { // returns true if valu
   }
 
   // get charIndex at position
-  for (unsigned int i = 0; i < symbols.length(); i++) {
+  for (unsigned int i = 0; i < symbolsLength; i++) {
     if ((*value)[value->length() - 1] == symbols[i]) {
       charIndex = i;
       break;
@@ -217,29 +237,22 @@ bool editValue (String* value, unsigned int* position) { // returns true if valu
 
   // button input
   if ((upButtonState == true) && (lastUpButtonState == false)) { // menu up cycle down a char at position
+    charIndex--;
+    if (charIndex == -1) {
+      charIndex = symbolsLength - 1;
+    }
+    (*value)[*position] = symbols[charIndex];
+  } else if ((downButtonState == true) && (lastDownButtonState == false)) { // menu down cycle up a char at position
     charIndex++;
-    if (charIndex == symbols.length()) {
+    if (charIndex == symbolsLength) {
       charIndex = 0;
     }
     (*value)[*position] = symbols[charIndex];
-    Serial.print(charIndex);
-    Serial.print(" ");
-    Serial.print(symbols[charIndex]);
-    Serial.println();
-  } else if ((downButtonState == true) && (lastDownButtonState == false)) { // menu down cycle up a char at position
-    charIndex--;
-    if (charIndex == -1) {
-      charIndex = symbols.length() - 1;
-    }
-    (*value)[*position] = symbols[charIndex];
-    Serial.print(charIndex);
-    Serial.print(" ");
-    Serial.print(symbols[charIndex]);
-    Serial.println();
+
   } else if ((selectButtonState == true) && (lastSelectButtonState == false)) { // select button pressed increase position or exit
     if (*position == maxLength) { // ran out of chars exit editor
       while ((*value)[value->length() - 1] == " ") { // remove empty spaces at the end
-        *value = value->substr(0, value->length() - 2);
+        *value = value->substring(0, value->length() - 2);
       }
       return true;
     }
@@ -248,13 +261,14 @@ bool editValue (String* value, unsigned int* position) { // returns true if valu
 
   // update display
   display.clearDisplay();
-  display.drawRect(0, 0, SCREEN_WIDTH, 11, SSD1306_WHITE);
+  display.drawRect(0, 4, maxLength * 7 + 4, 11, SSD1306_WHITE);
   display.setTextSize(1);      // Normal 1:1 pixel scale
   display.setTextColor(SSD1306_WHITE); // Draw white text
-  display.setCursor(2, 2);     // Start at top-left corner
+  display.setCursor(2, 6);     // Start at top-left corner
   display.cp437(true);         // Use full 256 char 'Code Page 437' font
   display.print(*value);
-  display.drawTriangle(*position * 7 + 2, 12, *position * 7, 14, *position * 7 + 4, 14, SSD1306_WHITE); // draw charicter highlight
+  display.drawTriangle(*position * 6 + 4, 0, *position * 6 + 2, 2, *position * 6 + 6, 2, SSD1306_WHITE); // draw charicter highlight
+  display.drawTriangle(*position * 6 + 4, 18, *position * 6 + 2, 16, *position * 6 + 6, 16, SSD1306_WHITE); // draw charicter highlight
   display.display();
   
   return false;

@@ -1,7 +1,10 @@
 #include <SPI.h>
-volatile boolean process;
+volatile boolean processTemperature;
+volatile boolean processAccesPoint;
+volatile boolean processPassword;
+volatile boolean processConnection;
 volatile float temperature;
-volatile boolean updateWiFi;
+char buff [50];
 
 // commands
 const byte SIMO_TEMPERATURE = B00000001;
@@ -22,12 +25,14 @@ boolean found = false;
 void setup (void) {
   Serial.begin(115200); // ESP setup 
   
-  connectWIFI();
+  //connectWIFI();
 
   pinMode(MISO, OUTPUT); // have to send on master in so it set as output
   SPCR |= _BV(SPE); // turn on SPI in slave mode
-  process = false;
-  updateWiFi = false;
+  processTemperature = false;
+  processAccesPoint = false;
+  processPassword = false;
+  processConnection = false;
   SPI.attachInterrupt(); // turn on interrupt
 }
 
@@ -44,7 +49,6 @@ void connectWIFI () { // ESP8266 setup
 }
  
 ISR (SPI_STC_vect) { // SPI interrupt routine
-  static char buff [50];
   static byte indx;
   
   static byte curentCommand;
@@ -54,20 +58,19 @@ ISR (SPI_STC_vect) { // SPI interrupt routine
     if (indx < sizeof buff) {
       buff [indx++] = recivedByte; // save data in the next index in the array buff
       if (recivedByte == '\r') { //check for the end of the word
-        temperature = atof(buff);
-        process = true;
+        processTemperature = true;
         indx = 0;
         curentCommand = B00000000;
       }
     }
   } else if (curentCommand == SIMO_CONNECT_WIFI) {
-    updateWiFi = true;
     curentCommand = B00000000;
+    processConnection = true;
   } else if (curentCommand ==  SIMO_ACCESS_POINT) {
     if (indx < sizeof buff) {
       buff [indx++] = recivedByte; // save data in the next index in the array buff
       if (recivedByte == '\r') { //check for the end of the word
-        accessPoint = String(buff);
+        processAccesPoint = true;
         indx = 0;
         curentCommand = B00000000;
       }
@@ -76,20 +79,25 @@ ISR (SPI_STC_vect) { // SPI interrupt routine
     if (indx < sizeof buff) {
       buff [indx++] = recivedByte; // save data in the next index in the array buff
       if (recivedByte == '\r') { //check for the end of the word
-        password = String(buff);
+        processPassword = true;
         indx = 0;
         curentCommand = B00000000;
       }
     }
   } else { // we dont have a curent command, the recived byte is the command
     curentCommand = recivedByte;
+    for (int i = 0; i < 50; i++) { // clear buffer
+      buff[i] = '\0'; 
+    }
   }
 }
  
 void loop (void) {
-  if (process) {
-    process = false; //reset the process
+  if (processTemperature) {
+    temperature = atof(buff);
+    processTemperature = false; //reset the process
 
+    /*
     String sensorByteStr = String(temperature);  
     String getData = "GET /update?api_key="+ API +"&field1="+sensorByteStr; // send to ThingSpeak, needs to be a string
     sendCommand("AT+CIPMUX=1",5,"OK");
@@ -97,14 +105,35 @@ void loop (void) {
     sendCommand("AT+CIPSEND=0," + String(getData.length()+4),4,">");
     Serial.println(getData);
     sendCommand("AT+CIPCLOSE=0",5,"OK");
+    */
+
+    Serial.print("T ");
+    Serial.print(temperature);
+    Serial.println();
+    
+  } else if (processAccesPoint) {
+    processAccesPoint = false;
+    accessPoint = String(buff);
+
+    Serial.print("AP ");
+    Serial.print(processAccesPoint);
+    Serial.println();
+    
+  } else if (processPassword) {
+    processPassword = false;
+    password = buff;
+
+    Serial.print("pass ");
+    Serial.print(password);
+    Serial.println();
+    
+  } else if (processConnection) {
+    processConnection = false;
+
+    Serial.print("conn ");
+    Serial.println();
   }
 
-  if (updateWiFi) {
-    updateWiFi = false;
-    digitalWrite(13, HIGH);
-    delay(500);
-    digitalWrite(13, LOW);
-  }
 }
 
 void sendCommand(String command, int maxTime, char readReplay[]){ // send data to ESP8266

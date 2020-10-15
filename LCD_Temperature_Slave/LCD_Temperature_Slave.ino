@@ -13,7 +13,7 @@ const byte SIMO_ACCESS_POINT = B00000011;
 const byte SIMO_PASSWORD = B00000100;
 
 // WIFI data
-String accessPoint = "Test";       // AP NAME. Change it to the AP you are using. You can even use the your smartphone's hotspot. 
+String accessPoint = "Guest";       // AP NAME. Change it to the AP you are using. You can even use the your smartphone's hotspot. 
 String password = ""; // AP PASSWORD. At FLC, the Guest AP doesn't need a password
 String API = "GVDN5WA12ZF3ZCU3"; // Must be your ThingSpeak channel's API. 
 String Host = "api.thingspeak.com";
@@ -25,7 +25,7 @@ boolean found = false;
 void setup (void) {
   Serial.begin(115200); // ESP setup 
   
-  //connectWIFI();
+  connectWIFI();
 
   pinMode(MISO, OUTPUT); // have to send on master in so it set as output
   SPCR |= _BV(SPE); // turn on SPI in slave mode
@@ -56,11 +56,12 @@ ISR (SPI_STC_vect) { // SPI interrupt routine
   
   if (curentCommand == SIMO_TEMPERATURE) {
     if (indx < sizeof buff) {
-      buff [indx++] = recivedByte; // save data in the next index in the array buff
       if (recivedByte == '\r') { //check for the end of the word
         processTemperature = true;
         indx = 0;
         curentCommand = B00000000;
+      } else {
+        buff [indx++] = recivedByte; // save data in the next index in the array buff
       }
     }
   } else if (curentCommand == SIMO_CONNECT_WIFI) {
@@ -68,20 +69,22 @@ ISR (SPI_STC_vect) { // SPI interrupt routine
     processConnection = true;
   } else if (curentCommand ==  SIMO_ACCESS_POINT) {
     if (indx < sizeof buff) {
-      buff [indx++] = recivedByte; // save data in the next index in the array buff
       if (recivedByte == '\r') { //check for the end of the word
         processAccesPoint = true;
         indx = 0;
         curentCommand = B00000000;
+      } else {
+        buff [indx++] = recivedByte; // save data in the next index in the array buff
       }
     }
   } else if (curentCommand ==  SIMO_PASSWORD) {
     if (indx < sizeof buff) {
-      buff [indx++] = recivedByte; // save data in the next index in the array buff
       if (recivedByte == '\r') { //check for the end of the word
         processPassword = true;
         indx = 0;
         curentCommand = B00000000;
+      } else {
+        buff [indx++] = recivedByte; // save data in the next index in the array buff
       }
     }
   } else { // we dont have a curent command, the recived byte is the command
@@ -97,7 +100,6 @@ void loop (void) {
     temperature = atof(buff);
     processTemperature = false; //reset the process
 
-    /*
     String sensorByteStr = String(temperature);  
     String getData = "GET /update?api_key="+ API +"&field1="+sensorByteStr; // send to ThingSpeak, needs to be a string
     sendCommand("AT+CIPMUX=1",5,"OK");
@@ -105,35 +107,21 @@ void loop (void) {
     sendCommand("AT+CIPSEND=0," + String(getData.length()+4),4,">");
     Serial.println(getData);
     sendCommand("AT+CIPCLOSE=0",5,"OK");
-    */
 
-    Serial.print("T ");
-    Serial.print(temperature);
-    Serial.println();
-    
   } else if (processAccesPoint) {
     processAccesPoint = false;
     accessPoint = String(buff);
-
-    Serial.print("AP ");
-    Serial.print(processAccesPoint);
-    Serial.println();
     
   } else if (processPassword) {
     processPassword = false;
-    password = buff;
-
-    Serial.print("pass ");
-    Serial.print(password);
-    Serial.println();
+    password = String(buff);
     
   } else if (processConnection) {
     processConnection = false;
-
-    Serial.print("conn ");
-    Serial.println();
+    //sendCommand("AT+RESTORE", 5, "OK");
+    sendCommand("AT+CWQAP", 5, "OK");
+    connectWIFI();
   }
-
 }
 
 void sendCommand(String command, int maxTime, char readReplay[]){ // send data to ESP8266

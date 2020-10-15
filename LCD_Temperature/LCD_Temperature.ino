@@ -40,11 +40,11 @@ float temperature = 0;
 
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   
   digitalWrite(SS, HIGH); // disable Slave Select
   SPI.begin ();
-  SPI.setClockDivider(SPI_CLOCK_DIV8);//divide the clock by 8
+  SPI.setClockDivider(SPI_CLOCK_DIV128);//divide the clock by 128
 
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for 128x64
@@ -251,8 +251,8 @@ bool editValue (String* value, unsigned int* position) { // returns true if valu
 
   } else if ((selectButtonState == true) && (lastSelectButtonState == false)) { // select button pressed increase position or exit
     if (*position == maxLength) { // ran out of chars exit editor
-      while ((*value)[value->length() - 1] == " ") { // remove empty spaces at the end
-        *value = value->substring(0, value->length() - 2);
+      while ((*value)[value->length() - 1] == ' ') { // remove empty spaces at the end
+        value->remove(value->length() - 1);
       }
       return true;
     }

@@ -1,0 +1,43 @@
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:1
+load:0x3fff0018,len:4
+load:0x3fff001c,len:1216
+ho 0 tail 12 room 4
+load:0x40078000,len:9720
+ho 0 tail 12 room 4
+load:0x40080400,len:6352
+entry 0x400806b8
+SD Card Type: SDHC
+SD Card Size: 14910MB
+Listing directory: /
+  DIR : /System Volume Information
+Creating Dir: /mydir
+Dir created
+Listing directory: /
+  DIR : /System Volume Information
+  DIR : /mydir
+Removing Dir: /mydir
+Dir removed
+Listing directory: /
+  DIR : /System Volume Information
+Listing directory: /System Volume Information
+  FILE: /System Volume Information/WPSettings.dat  SIZE: 12
+  FILE: /System Volume Information/IndexerVolumeGuid  SIZE: 76
+Writing file: /hello.txt
+File written
+Appending to file: /hello.txt
+Message appended
+Reading file: /hello.txt
+Read from file: Hello World!
+Deleting file: /foo.txt
+Delete failed
+Renaming file /hello.txt to /foo.txt
+File renamed
+Reading file: /foo.txt
+Read from file: Hello World!
+Failed to open file for reading
+1048576 bytes written for 1948 ms
+Total space: 14902MB
+Used space: 0MB
